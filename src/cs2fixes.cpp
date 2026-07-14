@@ -144,6 +144,8 @@ CGlobalVars* GetGlobals()
 }
 
 PLUGIN_EXPOSE(CS2Fixes, g_CS2Fixes);
+static CS2FixesSetModelApi g_CS2FixesSetModelApi{ SetModelFromApi };
+
 bool CS2Fixes::Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool late)
 {
 	PLUGIN_SAVEVARS();
@@ -1250,7 +1252,13 @@ bool CS2Fixes::Hook_ProcessVoiceData(const CCLCMsg_VoiceData_t& msg)
 
 void* CS2Fixes::OnMetamodQuery(const char* iface, int* ret)
 {
-	if (V_strcmp(iface, CS2FIXES_INTERFACE))
+	void* api = nullptr;
+
+	if (!V_strcmp(iface, CS2FIXES_INTERFACE))
+		api = static_cast<ICS2Fixes*>(&g_CS2Fixes);
+	else if (!V_strcmp(iface, CS2FIXES_SETMODEL_INTERFACE))
+		api = &g_CS2FixesSetModelApi;
+	else
 	{
 		if (ret)
 			*ret = META_IFACE_FAILED;
@@ -1261,7 +1269,7 @@ void* CS2Fixes::OnMetamodQuery(const char* iface, int* ret)
 	if (ret)
 		*ret = META_IFACE_OK;
 
-	return static_cast<ICS2Fixes*>(&g_CS2Fixes);
+	return api;
 }
 
 std::uint64_t CS2Fixes::GetAdminFlags(std::uint64_t iSteam64ID) const

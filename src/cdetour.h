@@ -55,6 +55,7 @@ public:
 	void FreeDetour() override;
 	const char* GetName() override { return m_pszName; }
 	T* GetFunc() { return m_pfnFunc; }
+	bool IsInstalled() const { return m_bInstalled; }
 
 	// Shorthand for calling original.
 	template <typename... Args>
@@ -78,6 +79,7 @@ template <typename T>
 CDetour<T>::CDetour(T* pfnDetour, const char* pszName) :
 	m_pfnDetour(pfnDetour), m_pszName(pszName)
 {
+	m_pfnFunc = nullptr;
 	m_hook = nullptr;
 	m_bInstalled = false;
 	m_pSignature = nullptr;
