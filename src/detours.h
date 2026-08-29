@@ -21,6 +21,7 @@
 #include "cdetour.h"
 #include "cs2_sdk/entityio.h"
 #include <utlsymbollarge.h>
+#include <cstdint>
 
 class CCheckTransmitInfo;
 class IRecipientFilter;
@@ -84,6 +85,7 @@ enum class AcquireResult
 bool InitDetours(CGameConfig* gameConfig);
 void FlushAllDetours();
 bool SetupFireOutputInternalDetour();
+std::int32_t SetModelFromApi(void* pModel, const char* pszModel);
 
 void FASTCALL Detour_UTIL_SayTextFilter(IRecipientFilter&, const char*, CCSPlayerController*, uint64);
 void FASTCALL Detour_UTIL_SayText2Filter(IRecipientFilter&, CCSPlayerController*, uint64, const char*, const char*, const char*, const char*, const char*);
@@ -120,3 +122,4 @@ void FASTCALL Detour_CCSGameRules_GoToIntermission(CCSGameRules* pThis, bool bAb
 void FASTCALL Detour_SetBeamOrigin(CBeam* pThis, const Vector* pVecWorldPosition);
 void FASTCALL Detour_SetBeamEndPos(CBeam* pThis, const Vector* pVecWorldPosition);
 bool FASTCALL Detour_IsCommandWhitelisted(void* pAddonManager, const char* pszCommandName);
+

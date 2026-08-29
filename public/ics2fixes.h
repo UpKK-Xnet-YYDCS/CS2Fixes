@@ -22,6 +22,16 @@
 #include <cstdint>
 
 #define CS2FIXES_INTERFACE "CS2Fixes001"
+#define CS2FIXES_SETMODEL_INTERFACE "CS2FixesSetModel001"
+
+using CS2FixesSetModelFn = std::int32_t (*)(void* pModel, const char* pszModel);
+
+struct CS2FixesSetModelApi
+{
+	// Calls the original SetModel trampoline owned by CS2Fixes.
+	// Returns 1 on success, or 0 when the bridge is unavailable or arguments are invalid.
+	CS2FixesSetModelFn SetModel;
+};
 
 class ICS2Fixes
 {

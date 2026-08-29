@@ -846,6 +846,7 @@ AcquireResult FASTCALL Detour_CCSPlayer_ItemServices_CanAcquire(CCSPlayer_ItemSe
 }
 
 bool g_bInScriptSetModel = false;
+static bool g_bSetModelApiReady = false;
 
 void FASTCALL Detour_CS_Script_SetModel(uint64_t unk1)
 {
@@ -861,6 +862,19 @@ void FASTCALL Detour_CBaseModelEntity_SetModel(CBaseModelEntity* pModel, const c
 
 	if (PrepareMapSetModel(pModel))
 		return CBaseModelEntity_SetModel(pModel, pszModel);
+}
+
+std::int32_t SetModelFromApi(void* pModel, const char* pszModel)
+{
+	if (!g_bSetModelApiReady || !pModel || !pszModel || !pszModel[0])
+		return 0;
+
+	auto pfnSetModel = CBaseModelEntity_SetModel.GetFunc();
+	if (!pfnSetModel)
+		return 0;
+
+	pfnSetModel(static_cast<CBaseModelEntity*>(pModel), pszModel);
+	return 1;
 }
 
 void FASTCALL Detour_CCSGameRules_GoToIntermission(CCSGameRules* pThis, bool bAbortedMatch)
@@ -905,6 +919,7 @@ bool FASTCALL Detour_IsCommandWhitelisted(void* pAddonManager, const char* pszCo
 bool InitDetours(CGameConfig* gameConfig)
 {
 	bool success = true;
+	g_bSetModelApiReady = false;
 
 	FOR_EACH_VEC(g_vecDetours, i)
 	{
@@ -914,11 +929,14 @@ bool InitDetours(CGameConfig* gameConfig)
 		g_vecDetours[i]->EnableDetour();
 	}
 
+	g_bSetModelApiReady = success && CBaseModelEntity_SetModel.IsInstalled() && CBaseModelEntity_SetModel.GetFunc() != nullptr;
 	return success;
 }
 
 void FlushAllDetours()
 {
+	g_bSetModelApiReady = false;
+
 	FOR_EACH_VEC_BACK(g_vecDetours, i)
 	{
 		g_vecDetours[i]->FreeDetour();
