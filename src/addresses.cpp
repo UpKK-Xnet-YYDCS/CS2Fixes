@@ -1,4 +1,4 @@
-﻿/**
+/**
  * =============================================================================
  * CS2Fixes
  * Copyright (C) 2023-2026 Source2ZE
@@ -76,10 +76,10 @@ bool addresses::Initialize(CGameConfig* g_GameConfig)
 	RESOLVE_SIG(g_GameConfig, "DispatchParticleEffect", addresses::DispatchParticleEffect);
 	RESOLVE_SIG(g_GameConfig, "CBaseEntity_EmitSoundFilter", addresses::CBaseEntity_EmitSoundFilter);
 	RESOLVE_SIG(g_GameConfig, "CBaseEntity_SetMoveType", addresses::CBaseEntity_SetMoveType);
-	RESOLVE_SIG(g_GameConfig, "CTakeDamageInfo", addresses::CTakeDamageInfo_Constructor);
 	RESOLVE_SIG(g_GameConfig, "CCSPlayer_WeaponServices_EquipWeapon", addresses::CCSPlayer_WeaponServices_EquipWeapon);
 	RESOLVE_SIG(g_GameConfig, "GetSpawnGroups", addresses::GetSpawnGroups);
 	RESOLVE_SIG(g_GameConfig, "CBasePlayerPawn_SnapViewAngles", addresses::CBasePlayerPawn_SnapViewAngles);
+	RESOLVE_SIG(g_GameConfig, "CBaseEntity_TakeDamageOld", addresses::CBaseEntity_TakeDamageOld);
 
 	return InitializeBanMap(g_GameConfig);
 }
