@@ -261,6 +261,7 @@
     <ClInclude Include="src\cs2_sdk\entity\ctriggerpush.h" />
     <ClInclude Include="src\cs2_sdk\entity\ctriggerteleport.h" />
     <ClInclude Include="src\cs2_sdk\entity\customhudlayout.h" />
+    <ClInclude Include="src\cs2_sdk\entity\custom_player_camera.h" />
     <ClInclude Include="src\cs2_sdk\entity\cvotecontroller.h" />
     <ClInclude Include="src\cs2_sdk\entity\globaltypes.h" />
     <ClInclude Include="src\cs2_sdk\entity\lights.h" />
@@ -270,6 +271,7 @@
     <ClInclude Include="src\cs2_sdk\schema.h" />
     <ClInclude Include="src\cs2_sdk\entityio.h" />
     <ClInclude Include="src\cs2_sdk\cchecktransmitinfo.h" />
+    <ClInclude Include="src\cs2_sdk\map.h" />
     <ClInclude Include="src\ctimer.h" />
     <ClInclude Include="src\customio.h" />
     <ClInclude Include="src\detours.h" />
@@ -311,6 +313,7 @@
     <ClInclude Include="src\utils\version_gen_placeholder.h" />
     <ClInclude Include="src\utils\hud_manager.h" />
     <ClInclude Include="src\utils\utils.h" />
+    <ClInclude Include="src\utils\khook_helpers.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

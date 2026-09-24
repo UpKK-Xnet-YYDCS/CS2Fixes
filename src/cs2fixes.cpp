@@ -27,7 +27,6 @@
 #include "common.h"
 #include "ctimer.h"
 #include "cvarwhitelist.h"
-#include "detours.h"
 #include "discord.h"
 #include "entities.h"
 #include "entity/customhudlayout.h"
@@ -41,6 +40,7 @@
 #include "hud_manager.h"
 #include "icvar.h"
 #include "idlemanager.h"
+#include "khook_helpers.h"
 #include "map_votes.h"
 #include "mapmigrations.h"
 #include "networkstringtabledefs.h"
@@ -101,6 +101,7 @@ bool CS2Fixes::Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool
 	GET_V_IFACE_ANY(GetServerFactory, g_pSource2GameEntities, ISource2GameEntities, SOURCE2GAMEENTITIES_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetServerFactory, g_pSource2GameClients, IServerGameClients, SOURCE2GAMECLIENTS_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetEngineFactory, g_pNetworkServerService, INetworkServerService, NETWORKSERVERSERVICE_INTERFACE_VERSION);
+	GET_V_IFACE_ANY(GetEngineFactory, g_pEngineServiceMgr, IEngineServiceMgr, ENGINESERVICEMGR_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetEngineFactory, g_gameEventSystem, IGameEventSystem, GAMEEVENTSYSTEM_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetEngineFactory, g_pNetworkMessages, INetworkMessages, NETWORKMESSAGES_INTERFACE_VERSION);
 	GET_V_IFACE_ANY(GetEngineFactory, g_pGameTypes, IGameTypes, GAMETYPES_INTERFACE_VERSION);
@@ -122,16 +123,16 @@ bool CS2Fixes::Load(PluginId id, ISmmAPI* ismm, char* error, size_t maxlen, bool
 		return false;
 	}
 
-	if (!addresses::Initialize(g_GameConfig))
+	if (!addresses::Initialize())
 		g_bRequiredInitLoaded = false;
 
 	if (!addresses::InitializeVScriptFunctions())
 		g_bRequiredInitLoaded = false;
 
-	InitVirtualHooks(g_GameConfig);
-	InitDetours(g_GameConfig);
+	InitVirtualHooks();
+	InitKHooks();
 
-	if (!InitPatches(g_GameConfig))
+	if (!InitPatches())
 		g_bRequiredInitLoaded = false;
 
 	if (!InitGameSystems())
@@ -374,7 +375,7 @@ void CS2Fixes::OnLevelInit(char const* pMapName,
 
 	// Only patch BotNavIgnore while a map is loaded, else adding bots will crash
 	if (V_strcmp(pMapName, "error"))
-		g_CommonPatches[1].PerformPatch(g_GameConfig);
+		g_CommonPatches[1].PerformPatch();
 
 	g_playerManager->SetupInfiniteAmmo();
 	g_pMapVoteSystem->OnLevelInit(pMapName);
@@ -402,7 +403,7 @@ void CS2Fixes::OnLevelShutdown()
 	if (g_cvarVoteManagerEnable.Get())
 		g_pMapVoteSystem->OnLevelShutdown();
 
-	CCSCustomHudLayout::ClearClickCallbacks();
+	CCSCustomHudLayout::ClearCallbacks();
 }
 
 bool CS2Fixes::Pause(char* error, size_t maxlen)
