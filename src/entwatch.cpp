@@ -1903,7 +1903,7 @@ float EW_UpdateHud()
 
 		if (g_cvarUseEntwatchClantag.Get())
 		{
-			V_snprintf(pItem->sClantag, sizeof(EWItemInstance::sClantag), "[%s]%s:", sItemText.c_str(), pItem->szShortName.c_str());
+			V_snprintf(pItem->sClantag, sizeof(EWItemInstance::sClantag), "%s: %s", sItemText.c_str(), pItem->szShortName.c_str());
 			if (pItem->bHasThisClantag)
 				pOwner->SetClanTag(pItem->sClantag);
 		}
@@ -2223,7 +2223,7 @@ void EW_PlayerDisconnect(int slot)
 	g_pEWHandler->PlayerDrop(EWDropReason::Disconnect, -1, pController);
 }
 
-void EW_FireOutput(const CEntityIOOutput* pThis, CEntityInstance* pActivator, CEntityInstance* pCaller, const CVariant* value, float flDelay)
+void EW_FireOutput(const CEntityIOOutput* pThis, CEntityInstance* pActivator, CEntityInstance* pCaller, float flDelay)
 {
 	if (!g_pEWHandler->IsConfigLoaded() || !pCaller)
 		return;
@@ -2248,7 +2248,7 @@ void EW_FireOutput(const CEntityIOOutput* pThis, CEntityInstance* pActivator, CE
 
 			// Message("Output for item %s (instance:%d)  handler:%d outputname:%s\n", g_pEWHandler->vecItems[i]->szItemName, i, j, pThis->m_pDesc->m_pName);
 			if (handler->type == EWHandlerType::CounterDown || handler->type == EWHandlerType::CounterUp)
-				handler->Use(value->m_float32);
+				handler->Use(((CMathCounter*)pCaller)->GetCounterValue());
 			else
 				handler->Use(0.0);
 		}

@@ -538,6 +538,9 @@ KHook::Return<bool> Detour_CEntityIdentity_AcceptInput(CEntityIdentity* pThis, C
 			return {KHook::Action::Supersede, CPointViewControlHandler::OnDisableAll(pViewControl)};
 	}
 
+	if (g_pMapMigrations->Detour_CEntityIdentity_AcceptInput(pThis, pInputName, pActivator, pCaller, value))
+		return {KHook::Action::Supersede, true};
+
 	VPROF_SCOPE_END();
 
 	return {KHook::Action::Ignore};
@@ -759,10 +762,10 @@ KHook::Return<bool> Detour_TraceShape(int64* a1, int64 a2, int64 a3, int64 a4, C
 KHook::Return<void> Detour_CEntityIOOutput_FireOutputInternal(CEntityIOOutput* pThis, CEntityInstance* pActivator, CEntityInstance* pCaller, CPulseArgumentPack* pArgumentPack, float flDelay, CPulseInputParamMap* pParamMap, const CVariant* value)
 {
 	if (g_cvarEnableButtonWatch.Get())
-		ButtonWatch(pThis, pActivator, pCaller, value, flDelay);
+		ButtonWatch(pThis, pActivator, pCaller, flDelay);
 
 	if (g_cvarEnableEntWatch.Get())
-		EW_FireOutput(pThis, pActivator, pCaller, value, flDelay);
+		EW_FireOutput(pThis, pActivator, pCaller, flDelay);
 
 	return {KHook::Action::Ignore};
 }
