@@ -123,6 +123,24 @@ void ZEPlayer::OnAuthenticated()
 	g_pUserPreferencesSystem->PullPreferences(GetPlayerSlot().Get());
 
 	SetSteamIdAttribute();
+
+	CCSPlayerController* pController = CCSPlayerController::FromSlot(GetPlayerSlot());
+
+	if (!g_cvarEnableMapSteamIds.Get() || !pController)
+		return;
+
+	IGameEvent* pEvent = g_gameEventManager->CreateEvent("player_connect");
+
+	if (!pEvent)
+		return;
+
+	pEvent->SetString("name", pController->GetPlayerName());
+	pEvent->SetPlayer("userid", GetPlayerSlot());
+	pEvent->SetBool("bot", false);
+	// Needs a custom name, because CS2 strips keys like xuid/networkid etc from logic_eventlistener output, and can't use uint64 because JS can't parse it..
+	pEvent->SetString("steam_id", std::to_string(GetSteamId64()).c_str());
+
+	g_gameEventManager->FireEvent(pEvent, true);
 }
 
 void ZEPlayer::CheckInfractions()
@@ -637,7 +655,7 @@ void ZEPlayer::CreatePointOrient()
 	pOrient->AcceptInput("SetTarget", "!activator", pPawn);
 }
 
-void ZEPlayer::ToggleThirdPerson(float flDistance)
+void ZEPlayer::ToggleThirdPerson(float flDistance, bool bForce)
 {
 	CCSPlayerController* pController = CCSPlayerController::FromSlot(GetPlayerSlot());
 
@@ -659,10 +677,17 @@ void ZEPlayer::ToggleThirdPerson(float flDistance)
 	if (pCamera)
 	{
 		// Map is taking control of the camera, let it be
-		if (pCamera->AsPointViewControl() || !CloseEnough(pCamera->m_vecFollowOffset().z, 0.001337))
+		if (pCamera->AsPointViewControl() || !CloseEnough(pCamera->m_vecFollowOffset().z, THIRD_PERSON_CAMERA_MARKER))
 			return;
 
-		// Camera is ours, disable it
+		// Edit current camera offset if distance is different
+		if (!CloseEnough(pCamera->m_vecCameraOffset().x, flDistance) && !bForce)
+		{
+			pCamera->m_vecCameraOffset = Vector(flDistance, pPawn->m_bLeftHanded ? 15.f : -15.f, 0.f);
+			return;
+		}
+
+		// Camera matches ours, disable it
 		pCamera->m_nCameraMode = CUSTOM_CAMERA_MODE_DISABLED;
 		pCameraService->m_hViewEntity = nullptr;
 
@@ -703,7 +728,7 @@ void ZEPlayer::ToggleThirdPerson(float flDistance)
 	pCamera->m_hFollowEntity = pPawn;
 	pCamera->m_nCameraMode = CUSTOM_CAMERA_MODE_FOLLOW_POSITION;
 	pCamera->m_bFollowEyes = true;
-	pCamera->m_vecFollowOffset = Vector(0.f, 0.f, 0.001337f); // HACK: Random tiny value to mark this as our camera
+	pCamera->m_vecFollowOffset = Vector(0.f, 0.f, THIRD_PERSON_CAMERA_MARKER); // HACK: Random tiny value to mark this as our camera
 	pCamera->m_vecCameraOffset = Vector(flDistance, pPawn->m_bLeftHanded ? 15.f : -15.f, 0.f);
 	pCamera->m_bClipCameraOffset = true;
 	pCamera->m_flCameraOffsetReturnStrength = 1.f;
@@ -1007,6 +1032,21 @@ void CPlayerManager::OnValidateAuthTicket(ValidateAuthTicketResponse_t* pRespons
 	}
 }
 
+bool CPlayerManager::IsUsingThirdPerson(CCSPlayerPawn* pPawn)
+{
+	CPlayer_CameraServices* pCameraService = pPawn->GetCameraService();
+
+	if (!pCameraService)
+		return false;
+
+	CCSCustomPlayerCamera* pCamera = (CCSCustomPlayerCamera*)pCameraService->m_hViewEntity().Get();
+
+	if (!pCamera)
+		return false;
+
+	return !pCamera->AsPointViewControl() && CloseEnough(pCamera->m_vecFollowOffset().z, THIRD_PERSON_CAMERA_MARKER);
+}
+
 void CPlayerManager::CheckInfractions()
 {
 	if (!GetGlobals())
@@ -1133,7 +1173,7 @@ void CPlayerManager::UpdatePlayerStates()
 		if (iCurrentPlayerState != iPreviousPlayerState)
 		{
 #ifdef _DEBUG
-			Message("Player %s changed states from %s to %s\n", pController->GetPlayerName().c_str(), g_szPlayerStates[iPreviousPlayerState], g_szPlayerStates[iCurrentPlayerState]);
+			Message("Player %s changed states from %s to %s\n", pController->GetPlayerName(), g_szPlayerStates[iPreviousPlayerState], g_szPlayerStates[iCurrentPlayerState]);
 #endif
 
 			pPlayer->SetPlayerState(iCurrentPlayerState);
@@ -1670,7 +1710,7 @@ ETargetError CPlayerManager::GetPlayersFromString(CCSPlayerController* pPlayer, 
 			if (!pTarget || !pTarget->IsController() || !pTarget->IsConnected() || pTarget->m_bIsHLTV)
 				continue;
 
-			if ((!bExactName && V_stristr(pTarget->GetPlayerName().c_str(), pszTarget)) || !V_strcmp(pTarget->GetPlayerName().c_str(), pszTarget))
+			if ((!bExactName && V_stristr(pTarget->GetPlayerName(), pszTarget)) || !V_strcmp(pTarget->GetPlayerName(), pszTarget))
 			{
 				nType = ETargetType::PLAYER;
 				if (iNumClients == 1)

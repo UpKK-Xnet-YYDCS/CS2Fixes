@@ -60,6 +60,7 @@ extern CConVar<bool> g_cvarEnableMapSteamIds;
 #define INVALID_ZEPLAYERHANDLE_INDEX 0u
 
 static uint32 iZEPlayerHandleSerial = 0u; // this should actually be 3 bytes large, but no way enough players join in servers lifespan for this to be an issue
+static constexpr float THIRD_PERSON_CAMERA_MARKER = 0.001337f;
 
 enum class ETargetType
 {
@@ -204,6 +205,7 @@ public:
 		m_bTopDefender = false;
 		m_flLastVoiceTime = -15.0f;
 		m_flBeaconEnabledTime = -2.0f;
+		m_bOriginalClanTagSaved = false;
 	}
 
 	~ZEPlayer()
@@ -277,6 +279,11 @@ public:
 	void SetTopDefenderStatus(bool bStatus) { m_bTopDefender = bStatus; }
 	void SetLastVoiceTime(float flTime) { m_flLastVoiceTime = flTime; }
 	void SetBeaconEnabledTime(float flTime) { m_flBeaconEnabledTime = flTime; }
+	void SetOriginalClanTag(std::string strClanTag)
+	{
+		m_strOriginalClanTag = strClanTag;
+		m_bOriginalClanTagSaved = true;
+	}
 
 	uint64 GetAdminFlags() { return m_iAdminFlags; }
 	int GetAdminImmunity() { return m_iAdminImmunity; }
@@ -329,6 +336,8 @@ public:
 	bool GetTopDefenderStatus() { return m_bTopDefender; }
 	float GetLastVoiceTime() { return m_flLastVoiceTime; }
 	float GetBeaconEnabledTime() { return m_flBeaconEnabledTime; }
+	std::string GetOriginalClanTag() { return m_strOriginalClanTag; }
+	bool IsOriginalClanTagSaved() { return m_bOriginalClanTagSaved; }
 
 	void OnSpawn();
 	void OnAuthenticated();
@@ -345,7 +354,7 @@ public:
 	void SetSteamIdAttribute();
 	void CreateEntwatchHud();
 	void CreatePointOrient();
-	void ToggleThirdPerson(float flDistance = -65.f);
+	void ToggleThirdPerson(float flDistance = -65.f, bool bForce = false);
 
 private:
 	bool m_bAuthenticated;
@@ -407,6 +416,8 @@ private:
 	bool m_bTopDefender;
 	float m_flLastVoiceTime;
 	float m_flBeaconEnabledTime;
+	std::string m_strOriginalClanTag;
+	bool m_bOriginalClanTagSaved;
 };
 
 class CPlayerManager
@@ -429,6 +440,7 @@ public:
 	void OnClientPutInServer(CPlayerSlot slot);
 	void OnLateLoad();
 	void OnSteamAPIActivated();
+	bool IsUsingThirdPerson(CCSPlayerPawn* pPawn);
 	void CheckInfractions();
 	void FlashLightThink();
 	void CheckHideDistances();
