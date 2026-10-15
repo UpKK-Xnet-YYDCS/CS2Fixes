@@ -89,7 +89,7 @@ KHOOK_MEMBER(CBaseModelEntity_SetModel, Detour_CBaseModelEntity_SetModel, nullpt
 KHOOK_MEMBER(CCSGameRules_GoToIntermission, Detour_CCSGameRules_GoToIntermission, nullptr);
 KHOOK_MEMBER(SetBeamOrigin, Detour_SetBeamOrigin, nullptr);
 KHOOK_MEMBER(SetBeamEndPos, Detour_SetBeamEndPos, nullptr);
-KHOOK_FUNCTION(IsCommandWhitelisted, Detour_IsCommandWhitelisted, nullptr);
+//KHOOK_FUNCTION(IsCommandWhitelisted, Detour_IsCommandWhitelisted, nullptr);
 KHOOK_MEMBER(CWorldRendererMgr_CreateWorld_Internal, nullptr, Detour_CWorldRendererMgr_CreateWorld_Internal_Post);
 
 std::vector<CKHookBase*>& GetKHookList()
