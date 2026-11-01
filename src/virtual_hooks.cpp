@@ -26,12 +26,15 @@
 #include "cs_gameevents.pb.h"
 #include "cstrike15_usermessages.pb.h"
 #include "ctimer.h"
+#include "detours.h"
 #include "engine2/iengineservicemgr.h"
 #include "engine2/inetworkgameserver.h"
 #include "engine2/ivengineserver2.h"
 #include "engine2/serversideclient.h"
 #include "entities.h"
 #include "entity/ccsplayercontroller.h"
+#include "entity/cgameplayerequip.h"
+#include "entity/cgamerules.h"
 #include "entity/customhudlayout.h"
 #include "entity/services.h"
 #include "entitylistener.h"
@@ -50,15 +53,13 @@
 #include "panoramavote.h"
 #include "playermanager.h"
 #include "tier0/icvar.h"
+#include "tier0/splitstring.h"
 #include "tier0/vprof.h"
 #include "usermessages.pb.h"
 #include "votemanager.h"
 #include "zombiereborn.h"
 
 #include "tier0/memdbgon.h"
-
-class GameSessionConfiguration_t
-{};
 
 KHOOK_VIRTUAL(GameFrame, &IServerGameDLL::GameFrame, g_pSource2Server, nullptr, Hook_GameFrame_Post);
 KHOOK_VIRTUAL(GameServerSteamAPIActivated, &IServerGameDLL::GameServerSteamAPIActivated, g_pSource2Server, Hook_GameServerSteamAPIActivated, nullptr);
@@ -76,16 +77,16 @@ KHOOK_VIRTUAL(StartupServer, &INetworkServerService::StartupServer, g_pNetworkSe
 KHOOK_VIRTUAL(CheckTransmit, &ISource2GameEntities::CheckTransmit, g_pSource2GameEntities, nullptr, Hook_CheckTransmit_Post);
 KHOOK_VIRTUAL(DispatchConCommand, &ICvar::DispatchConCommand, g_pCVar, Hook_DispatchConCommand, nullptr);
 KHOOK_VIRTUAL(SwitchToLoop, &IEngineServiceMgr::SwitchToLoop, g_pEngineServiceMgr, Hook_SwitchToLoop, nullptr);
+KHOOK_VIRTUAL(UnloadSpawnGroup, &IVEngineServer2::UnloadSpawnGroup, g_pEngineServer2, Hook_UnloadSpawnGroup, nullptr);
 
 KHook::Virtual<IGameTypes, void, const char*, const CUtlStringList&> createWorkshopMapGroupHook(0U, Hook_CreateWorkshopMapGroup, nullptr);
 KHook::Virtual<IGameEventManager2, int, const char*, bool> loadEventsFromFileHook(&IGameEventManager2::LoadEventsFromFile, Hook_LoadEventsFromFile, nullptr);
 KHook::Virtual<CServerSideClient, bool, const CNetMessagePB<CCLCMsg_VoiceData>&> processVoiceDataHook(&CServerSideClient::ProcessVoiceData, Hook_ProcessVoiceData, nullptr);
-KHook::Virtual<INetworkGameServer, void, IGameSpawnGroupMgr*> setGameSpawnGroupMgrHook(&INetworkGameServer::SetGameSpawnGroupMgr, Hook_SetGameSpawnGroupMgr, nullptr);
 KHook::Virtual<CVPhys2World, void, CUtlVector<TouchLinked_t>*, bool> getTouchingListHook(0U, nullptr, Hook_GetTouchingList_Post);
 KHook::Virtual<CCSPlayer_MovementServices, void, double> checkMovingGroundHook(0U, Hook_CheckMovingGround, nullptr);
 KHook::Virtual<CCSPlayer_WeaponServices, void, CBasePlayerWeapon*, Vector*, Vector*> dropWeaponHook(0U, nullptr, Hook_DropWeapon_Post);
 KHook::Virtual<CGamePlayerEquip, void, InputData_t*> playerEquipUseHook(0U, Hook_PlayerEquipUse, nullptr);
-KHook::Virtual<CGamePlayerEquip, void, CEntityPrecacheContext*> playerEquipPrecacheHook(0U, nullptr, Hook_PlayerEquipPrecache_Post);
+KHook::Virtual<CGamePlayerEquip, void, CEntityPrecacheContext*> playerEquipPrecacheHook(0U, Hook_PlayerEquipPrecache, nullptr);
 KHook::Virtual<CTriggerGravity, void, CEntityPrecacheContext*> triggerGravityPrecacheHook(0U, nullptr, Hook_TriggerGravityPrecache_Post);
 KHook::Virtual<CTriggerGravity, void, CBaseEntity*> triggerGravityEndTouchHook(0U, nullptr, Hook_TriggerGravityEndTouch_Post);
 KHook::Virtual<CCSPlayerPawn, bool, CTakeDamageResult*> onTakeDamageAliveHook(0U, Hook_OnTakeDamage_Alive, nullptr);
@@ -159,7 +160,6 @@ void RemoveVirtualHooks()
 {
 	loadEventsFromFileHook.RemoveGlobal((IGameEventManager2*)&g_pCGameEventManagerVTable);
 	processVoiceDataHook.RemoveGlobal((CServerSideClient*)&g_pCServerSideClientVTable);
-	setGameSpawnGroupMgrHook.Remove(GetNetworkGameServer());
 	createWorkshopMapGroupHook.Remove(g_pGameTypes);
 	getTouchingListHook.RemoveGlobal((CVPhys2World*)&g_pCVPhys2WorldVTable);
 	checkMovingGroundHook.RemoveGlobal((CCSPlayer_MovementServices*)&g_pCCSPlayer_MovementServicesVTable);
@@ -373,6 +373,110 @@ KHook::Return<void> Hook_ClientSvcUserMessage(IServerGameClients* pThis, CPlayer
 	return {KHook::Action::Ignore};
 }
 
+void SayChatMessageWithTimer(CUserMessageSayText* pMsg)
+{
+	VPROF("SayChatMessageWithTimer");
+
+	const char* pText = pMsg->text().c_str();
+	char buf[256];
+
+	// Filter console message - remove non-alphanumeric chars and convert to lowercase
+	uint32 uiTextLength = strlen(pText);
+	uint32 uiFilteredTextLength = 0;
+	char filteredText[256];
+
+	for (uint32 i = 0; i < uiTextLength; i++)
+	{
+		if (pText[i] >= 'A' && pText[i] <= 'Z')
+			filteredText[uiFilteredTextLength++] = pText[i] + 32;
+		if (pText[i] == ' ' || (pText[i] >= '0' && pText[i] <= '9') || (pText[i] >= 'a' && pText[i] <= 'z'))
+			filteredText[uiFilteredTextLength++] = pText[i];
+	}
+	filteredText[uiFilteredTextLength] = '\0';
+
+	// Split console message into words seperated by the space character
+	CSplitString words(filteredText, " ");
+
+	// Word count includes the first word "Console:" at index 0, first relevant word is at index 1
+	int iWordCount = words.Count();
+	uint32 uiTriggerTimerLength = 0;
+
+	if (iWordCount == 2)
+		uiTriggerTimerLength = V_StringToUint32(words.Element(1), 0, NULL, NULL, PARSING_FLAG_SKIP_WARNING);
+
+	for (int i = 1; i < iWordCount && uiTriggerTimerLength == 0; i++)
+	{
+		uint32 uiCurrentValue = V_StringToUint32(words.Element(i), 0, NULL, NULL, PARSING_FLAG_SKIP_WARNING);
+		uint32 uiNextWordLength = 0;
+		char* pNextWord = NULL;
+
+		if (i + 1 < iWordCount)
+		{
+			pNextWord = words.Element(i + 1);
+			uiNextWordLength = strlen(pNextWord);
+		}
+
+		// Case: ... X sec(onds) ... or ... X s ... or ... X min(utes) ...
+		if (pNextWord != NULL && uiCurrentValue > 0)
+		{
+			if (uiNextWordLength == 1)
+			{
+				if (pNextWord[0] == 's')
+					uiTriggerTimerLength = uiCurrentValue;
+			}
+			else if (uiNextWordLength > 2)
+			{
+				if (pNextWord[0] == 's' && pNextWord[1] == 'e' && pNextWord[2] == 'c')
+					uiTriggerTimerLength = uiCurrentValue;
+				if (pNextWord[0] == 'm' && pNextWord[1] == 'i' && pNextWord[2] == 'n')
+					uiTriggerTimerLength = uiCurrentValue * 60;
+			}
+		}
+
+		// Case: ... Xs - only support up to 3 digit numbers (in seconds) for this timer parse method
+		if (uiCurrentValue == 0)
+		{
+			char* pCurrentWord = words.Element(i);
+			uint32 uiCurrentScanLength = MIN(strlen(pCurrentWord), 4);
+
+			for (uint32 j = 0; j < uiCurrentScanLength; j++)
+			{
+				if (pCurrentWord[j] >= '0' && pCurrentWord[j] <= '9')
+					continue;
+
+				if (pCurrentWord[j] == 's')
+				{
+					pCurrentWord[j] = '\0';
+					uiTriggerTimerLength = V_StringToUint32(pCurrentWord, 0, NULL, NULL, PARSING_FLAG_SKIP_WARNING);
+				}
+				break;
+			}
+		}
+	}
+
+	float fCurrentRoundClock = g_pGameRules->m_iRoundTime - (GetGlobals()->curtime - g_pGameRules->m_fRoundStartTime.Get().GetTime());
+
+	// Only display trigger time if the timer is greater than 4 seconds, and time expires within the round
+	if ((uiTriggerTimerLength > 4) && (fCurrentRoundClock > uiTriggerTimerLength))
+	{
+		int iTriggerTime = fCurrentRoundClock - uiTriggerTimerLength;
+
+		// Round timer to nearest whole second
+		if ((int)(fCurrentRoundClock - 0.5f) == (int)fCurrentRoundClock)
+			iTriggerTime++;
+
+		int mins = iTriggerTime / 60;
+		int secs = iTriggerTime % 60;
+
+		V_snprintf(buf, sizeof(buf), "%s %s %s %2d:%02d", " \7CONSOLE:\4", pText + sizeof("Console:"), "\x10- @", mins, secs);
+	}
+	else
+		V_snprintf(buf, sizeof(buf), "%s %s", " \7CONSOLE:\4", pText + sizeof("Console:"));
+
+	pMsg->set_text(buf);
+}
+
+CConVar<bool> g_cvarEnableTriggerTimer("cs2f_trigger_timer_enable", FCVAR_NONE, "Whether to process countdown messages said by Console (e.g. Hold for 10 seconds) and append the round time where the countdown resolves", false);
 CConVar<bool> g_cvarBlockParticleMsgs("cs2f_block_particle_msgs", FCVAR_NONE, "Whether to block CUserMsg_ParticleManager messages to fix lag/crashes, experimental", false);
 
 KHook::Return<void> Hook_PostEventAbstract(IGameEventSystem* pThis, CSplitScreenSlot nSlot, bool bLocalOnly, int nClientCount, const uint64* clients,
@@ -498,6 +602,24 @@ KHook::Return<void> Hook_PostEventAbstract(IGameEventSystem* pThis, CSplitScreen
 			*(uint64*)clients &= ~silenceSoundMask;
 		}
 	}
+	else if (info->m_MessageId == UM_SayText)
+	{
+		auto msg = const_cast<CNetMessage*>(pData)->ToPB<CUserMessageSayText>();
+
+		if (msg->playerindex() != -1 || V_strncmp(msg->text().c_str(), "Console: ", 9))
+			return {KHook::Action::Ignore};
+
+		if (g_cvarEnableTriggerTimer.Get() && GetGlobals() && g_pGameRules)
+		{
+			SayChatMessageWithTimer(msg);
+		}
+		else
+		{
+			char buf[256];
+			V_snprintf(buf, sizeof(buf), "%s %s", " \7CONSOLE:\4", msg->text().c_str() + sizeof("Console:"));
+			msg->set_text(buf);
+		}
+	}
 	else if (info->m_MessageId == UM_ParticleManager)
 	{
 		// These messages were previously unused, but recently started being used for weapon particles in the AG2 update
@@ -516,9 +638,6 @@ KHook::Return<void> Hook_StartupServer_Post(INetworkServerService* pThis, const 
 	g_pEntitySystem = GameEntitySystem();
 	g_pEntitySystem->AddListenerEntity(g_pEntityListener);
 
-	if (GetNetworkGameServer())
-		setGameSpawnGroupMgrHook.Add(GetNetworkGameServer());
-
 	Message("Hook_StartupServer: %s\n", pszMapName);
 
 	RegisterEventListeners();
@@ -531,6 +650,7 @@ KHook::Return<void> Hook_StartupServer_Post(INetworkServerService* pThis, const 
 	g_pPanoramaVoteHandler->Reset();
 	g_pVoteManager->VoteManager_Init();
 	g_pIdleSystem->Reset();
+	g_setUnloadingSpawnGroups.clear();
 
 	INetworkStringTable* pInfoPanelTable = g_pNetworkStringTableServer->FindTable("InfoPanel");
 
@@ -730,6 +850,13 @@ KHook::Return<void> Hook_SwitchToLoop(IEngineServiceMgr* pThis, const char* pszL
 	return {KHook::Action::Ignore};
 }
 
+KHook::Return<void> Hook_UnloadSpawnGroup(IVEngineServer2* pThis, SpawnGroupHandle_t hSpawnGroup, int unloadOption)
+{
+	g_setUnloadingSpawnGroups.insert(hSpawnGroup);
+
+	return {KHook::Action::Ignore};
+}
+
 KHook::Return<void> Hook_CreateWorkshopMapGroup(IGameTypes* pThis, const char* name, const CUtlStringList& mapList)
 {
 	if (g_cvarVoteManagerEnable.Get() && g_pMapVoteSystem->IsMapListLoaded())
@@ -761,14 +888,6 @@ KHook::Return<bool> Hook_ProcessVoiceData(CServerSideClient* pClient, const CNet
 
 	if (GetGlobals())
 		pPlayer->SetLastVoiceTime(GetGlobals()->curtime);
-
-	return {KHook::Action::Ignore};
-}
-
-KHook::Return<void> Hook_SetGameSpawnGroupMgr(INetworkGameServer* pThis, IGameSpawnGroupMgr* pSpawnGroupMgr)
-{
-	// This also resets our stored pointer on deletion, since null gets passed into this function, nice!
-	g_pSpawnGroupMgr = (CSpawnGroupMgrGameSystem*)pSpawnGroupMgr;
 
 	return {KHook::Action::Ignore};
 }
@@ -883,12 +1002,16 @@ KHook::Return<void> Hook_PlayerEquipUse(CGamePlayerEquip* pThis, InputData_t* pI
 	return {KHook::Action::Ignore};
 }
 
-KHook::Return<void> Hook_PlayerEquipPrecache_Post(CGamePlayerEquip* pThis, CEntityPrecacheContext* param)
+KHook::Return<void> Hook_PlayerEquipPrecache(CGamePlayerEquip* pThis, CEntityPrecacheContext* param)
 {
-	const auto kv = param->m_pKeyValues;
-	CGamePlayerEquipHandler::OnPrecache(pThis, kv);
+	CEntityKeyValues filteredKV;
 
-	return {KHook::Action::Ignore};
+	if (!CGamePlayerEquipHandler::OnPrecache(pThis, param->m_pKeyValues, &filteredKV))
+		return {KHook::Action::Ignore};
+
+	CEntityPrecacheContext context = *param;
+	context.m_pKeyValues = &filteredKV;
+	return KHook::Recall<void (CGamePlayerEquip::*)(CEntityPrecacheContext*)>(nullptr, {KHook::Action::Ignore}, pThis, &context);
 }
 
 KHook::Return<void> Hook_TriggerGravityPrecache_Post(CTriggerGravity* pThis, CEntityPrecacheContext* param)

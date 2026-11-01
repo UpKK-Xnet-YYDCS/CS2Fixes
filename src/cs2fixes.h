@@ -21,6 +21,7 @@
 
 #include "engine2/igameeventsystem.h"
 #include "engine2/isource2engine.h"
+#include "engine2/networkgameserverbase.h"
 #include "entity/cgamerules.h"
 #include "igameevents.h"
 #include "netmessages.pb.h"
@@ -29,7 +30,6 @@
 #include "public/ics2fixes.h"
 #include "steam/isteamhttp.h"
 #include <ISmmPlugin.h>
-#include <engine2/inetworkgameserver.h>
 
 #ifdef AMBUILD
 	#include "version_gen.h"
@@ -42,12 +42,11 @@ extern IGameEventManager2* g_gameEventManager;
 extern CGameEntitySystem* g_pEntitySystem;
 extern IVEngineServer2* g_pEngineServer2;
 extern CCSGameRules* g_pGameRules;
-extern CSpawnGroupMgrGameSystem* g_pSpawnGroupMgr;
 extern double g_flUniversalTime;
 extern float g_flLastTickedTime;
 extern bool g_bHasTicked;
 extern bool g_bRequiredInitLoaded;
-extern INetworkGameServer* GetNetworkGameServer();
+extern CNetworkGameServerBase* GetNetworkGameServer();
 extern CGlobalVars* GetGlobals();
 extern CConVar<bool> g_cvarDropMapWeapons;
 

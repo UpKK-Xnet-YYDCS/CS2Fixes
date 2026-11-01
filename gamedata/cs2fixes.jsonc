@@ -1,20 +1,6 @@
 {
 	"Signatures":
 	{
-		// Called from Host_Say
-		"UTIL_SayTextFilter":
-		{
-			"library": "server",
-			"windows": "48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 49 8B D8",
-			"linux": "55 48 8D 05 ? ? ? ? 48 89 E5 41 57 41 56 4C 8D 75 ? 41 55 41 89 CD"
-		},
-		// Called from Host_Say
-		"UTIL_SayText2Filter":
-		{
-			"library": "server",
-			"windows": "48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 41 8B D8",
-			"linux": "55 48 8D 05 ? ? ? ? 48 89 E5 41 57 41 89 D7 31 D2"
-		},
 		// idk a good way to find this again, i just brute forced the vtable. offset is 136 on CTriggerPush
 		"TriggerPush_Touch":
 		{
@@ -291,13 +277,6 @@
 			"windows": "48 8D 0D ? ? ? ? 45 33 C0 4C 89 74 24 ? 0F 11 44 24",
 			"linux": "48 8D 35 ? ? ? ? 89 C2 48 63 46"
 		},
-		// Called right before "%d spawn groups:\n"
-		"GetSpawnGroups":
-		{
-			"library": "server",
-			"windows": "40 56 48 83 EC ? 48 89 5C 24 ? 48 8D B1",
-			"linux": "55 49 89 F1 BE ? ? ? ? 48 89 E5 41 57 41 56 4C 8D BF"
-		},
 		// Only has "weapon_incgrenade" and "weapon_incgrenade" strings
 		// May need to look into custom way of acquiring this function address, normal sig sees frequent breakage in the CS# project
 		"CCSPlayer_ItemServices_CanAcquire":
@@ -360,6 +339,13 @@
 			"library": "worldrenderer",
 			"windows": "48 89 5C 24 ? 48 89 54 24 ? 55 56 57 48 81 EC",
 			"linux": "55 48 89 E5 41 56 41 55 41 54 49 89 FC 53 48 89 F3 48 83 EC ? F6 46"
+		},
+		// Called in CCSGameRules::CleanUpMap with filter "cs_respawn"
+		"CGameEntitySystem_CreateEntities":
+		{
+			"library": "server",
+			"windows": "4C 89 4C 24 ? 89 54 24 ? 48 89 4C 24 ? 55 53 56 57 41 54 41 55 41 56 41 57 48 81 EC",
+			"linux": "55 48 89 E5 41 57 41 56 48 8D 85 ? ? ? ? 49 89 D6"
 		}
 	},
 	"Offsets":
@@ -434,13 +420,6 @@
 		{
 			"windows": 25,
 			"linux": 26
-		},
-		// engine
-		// "tried to sprint to a non-client", there will be a check above like this: if ( a2 >= *(v5 + 616) ), note that this is a CUtlVector
-		"CNetworkGameServer_ClientList":
-		{
-			"windows": 77,
-			"linux": 77
 		},
 		// Right above "mapgroup workshop;" string there is a virtual call to this on g_pGameTypes using "workshop" string
 		"IGameTypes_CreateWorkshopMapGroup":
